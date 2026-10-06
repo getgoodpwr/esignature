@@ -90,7 +90,9 @@ function renderLogin(msg){$('#root').innerHTML='<div style="min-height:100vh;dis
 /* ===== shell ===== */
 let page='dash';
 function renderShell(p){page=p;const u=S.user,nav=[['dash','Dashboard'],['docs','Documents'],['tpl','Templates'],['send','Send for Signature'],['team','Team']];
- $('#root').innerHTML='<div id="app"><aside id="side"><div class="logo">GOODPWR E-SIGN</div><nav class="nav">'+nav.map(n=>'<a data-p="'+n[0]+'" class="'+(n[0]===p?'on':'')+'">'+n[1]+'</a>').join('')+'</nav><div id="me" style="margin-top:auto;font-size:12px"><b>'+esc(u.name)+'</b><br>'+esc(u.email)+'<br>'+esc(u.role)+' · '+esc(u.company)+'<br><button class="btn s" id="so" style="margin-top:8px">Sign out</button></div></aside><main id="main"></main></div>';
+ $('#root').innerHTML='<div class="logo">
+  <img src="https://res.cloudinary.com/dhllzxhst/image/upload/v1788389852/Screenshot_2026-09-02_175622_iqquwf.png" alt="GoodPwr E-signature" style="max-height: 28px; display: block;" />
+</div>';
  document.querySelectorAll('.nav a').forEach(a=>a.onclick=()=>renderShell(a.dataset.p));$('#so').onclick=()=>signOut();
  ({dash:viewDash,docs:viewDocs,send:()=>viewSend(),tpl:viewTpl,team:viewTeam})[p]()}
 const skel=()=>'<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
