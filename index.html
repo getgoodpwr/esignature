@@ -85,14 +85,12 @@ function signOut(silent){if(!silent&&S.token)call('logout').catch(()=>{});S.toke
 function renderLogin(msg){$('#root').innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px"><div class="card" style="width:100%;max-width:380px;padding:28px"><div class="logo" style="padding-left:0">GOODPWR E-SIGN</div><h1>Sign in</h1><p class="sub">Use your @getgoodpwr.com email to sign in.</p>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+
  '<label>Name<input id="nm" autocomplete="name"></label><br><br><label>Email<input id="em" type="email" placeholder="you@getgoodpwr.com" autocomplete="username"></label><br><br><button class="btn p" id="go" style="width:100%">Sign in</button></div></div>';
  const go=()=>busy($('#go'),'Signing in...',async()=>{const r=await call('login',{name:$('#nm').value,email:$('#em').value});S.token=r.token;S.user=r.user;try{sessionStorage.setItem('gp',r.token);sessionStorage.setItem('gpu',JSON.stringify(r.user))}catch(e){}renderShell('dash')});
- $('#go').onclick=go;$('#em').onkeydown=e=>{if(e.key==='Enter')go()}}
+ ('#go').onclick=go;('#em').onkeydown=e=>{if(e.key==='Enter')go()}}
 
 /* ===== shell ===== */
 let page='dash';
 function renderShell(p){page=p;const u=S.user,nav=[['dash','Dashboard'],['docs','Documents'],['tpl','Templates'],['send','Send for Signature'],['team','Team']];
- $('#root').innerHTML='<div class="logo">
-  <img src="https://res.cloudinary.com/dhllzxhst/image/upload/v1788389852/Screenshot_2026-09-02_175622_iqquwf.png" alt="GoodPwr E-signature" style="max-height: 28px; display: block;" />
-</div>';
+ $('#root').innerHTML='<div id="app"><aside id="side"><div class="logo">GOODPWR E-SIGN</div><nav class="nav">'+nav.map(n=>'<a data-p="'+n[0]+'" class="'+(n[0]===p?'on':'')+'">'+n[1]+'</a>').join('')+'</nav><div id="me" style="margin-top:auto;font-size:12px"><b>'+esc(u.name)+'</b><br>'+esc(u.email)+'<br>'+esc(u.role)+' · '+esc(u.company)+'<br><button class="btn s" id="so" style="margin-top:8px">Sign out</button></div></aside><main id="main"></main></div>';
  document.querySelectorAll('.nav a').forEach(a=>a.onclick=()=>renderShell(a.dataset.p));$('#so').onclick=()=>signOut();
  ({dash:viewDash,docs:viewDocs,send:()=>viewSend(),tpl:viewTpl,team:viewTeam})[p]()}
 const skel=()=>'<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
@@ -105,15 +103,15 @@ async function viewDash(){const m=$('#main');m.innerHTML='<h1>Good '+(new Date()
  const paint=()=>{const n=f=>DOCS.filter(f).length,soon=Date.now()+3*864e5,live=d=>['SENT','VIEWED','PARTIALLY_SIGNED'].includes(d.status);
  const c=[['Action Required',n(d=>d.mine)],['Waiting for Others',n(d=>live(d)&&!d.mine)],['Completed',n(d=>d.status==='COMPLETED')],['Drafts',n(d=>d.status==='DRAFT')],['Expiring Soon',n(d=>live(d)&&d.expiresAt&&new Date(d.expiresAt)<soon)]];
  m.innerHTML='<div class="top"><div><h1>Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+esc(S.user.name.split(' ')[0])+'</h1><p class="sub" style="margin:0">Here\'s what\'s happening with your documents.</p></div><button class="btn p" id="ns">Send for Signature</button></div><div class="cards">'+c.map(x=>'<div class="card stat"><b>'+x[1]+'</b>'+x[0]+'</div>').join('')+'</div><div class="card"><h3>Recent Documents</h3><div id="tbl"></div></div>';
- $('#ns').onclick=()=>renderShell('send');docTable($('#tbl'),DOCS.slice(0,8))};
+ ('#ns').onclick=()=>renderShell('send');docTable(('#tbl'),DOCS.slice(0,8))};
  if(DOCS.length)paint();try{await loadDocs();paint()}catch(e){if(!DOCS.length)m.innerHTML+='<div class="err">'+esc(e.message)+'</div>'}}
 function viewDocs(){const m=$('#main');m.innerHTML='<div class="top"><h1>Documents</h1><button class="btn p" id="ns">Send for Signature</button></div><div class="card"><div class="tabs" id="tabs"></div><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Search documents or recipients" class="grow"><select id="sort" style="width:auto"><option value="u">Newest activity</option><option value="n">Name</option></select></div><div id="tbl">'+skel()+'</div></div>';
  $('#ns').onclick=()=>renderShell('send');
  const tabs=[['all','All',()=>true],['act','Action Required',d=>d.mine],['wait','Waiting for Others',d=>['SENT','VIEWED','PARTIALLY_SIGNED'].includes(d.status)&&!d.mine],['done','Completed',d=>d.status==='COMPLETED'],['draft','Drafts',d=>d.status==='DRAFT'],['void','Voided',d=>d.status==='VOIDED']];let cur='all';
- const draw=()=>{$('#tabs').innerHTML=tabs.map(t=>'<button data-t="'+t[0]+'" class="'+(t[0]===cur?'on':'')+'">'+t[1]+'</button>').join('');$('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{cur=b.dataset.t;draw()});
+ const draw=()=>{('#tabs').innerHTML=tabs.map(t=>'<buttondata-t="'+t[0]+'"class="'+(t[0]===cur?'on':'')+'">'+t[1]+'</button>').join('');('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{cur=b.dataset.t;draw()});
   const q=$('#q').value.toLowerCase(),f=tabs.find(t=>t[0]===cur)[2];let l=DOCS.filter(f).filter(d=>!q||(d.name+d.recipients.map(r=>r.name+r.email).join(' ')).toLowerCase().includes(q));
-  if($('#sort').value==='n')l=l.slice().sort((a,b)=>a.name.localeCompare(b.name));docTable($('#tbl'),l,true)};
- $('#q').oninput=draw;$('#sort').onchange=draw;if(DOCS.length)draw();loadDocs().then(draw).catch(e=>$('#tbl').innerHTML='<div class="err">'+esc(e.message)+'</div>')}
+  if(('#sort').value==='n')l=l.slice().sort((a,b)=>a.name.localeCompare(b.name));docTable(('#tbl'),l,true)};
+ ('#q').oninput=draw;('#sort').onchange=draw;if(DOCS.length)draw();loadDocs().then(draw).catch(e=>$('#tbl').innerHTML='<div class="err">'+esc(e.message)+'</div>')}
 function docTable(el,list,full){if(!list.length){el.innerHTML=empty('No documents yet','Send your first document for signature and track everything in one place.','<button class="btn p" id="e1">Send for Signature</button>');$('#e1').onclick=()=>renderShell('send');return}
  el.innerHTML='<div class="tw"><table><thead><tr><th>Document</th><th>Recipient(s)</th><th>Status</th>'+(full?'<th>Progress</th>':'')+'<th>Created</th><th>Last Activity</th><th>Actions</th></tr></thead><tbody>'+list.map(d=>{const live=['SENT','VIEWED','PARTIALLY_SIGNED'].includes(d.status);
   return '<tr><td><b>'+esc(d.name)+'</b><br><span class="sub">'+esc(d.senderName)+'</span></td><td>'+d.recipients.map(r=>esc(r.name)+(r.role!=='signer'?' ('+r.role+')':'')).join('<br>')+'</td><td><span class="badge b-'+d.status+'">'+(ST[d.status]||d.status)+'</span></td>'+
@@ -161,7 +159,7 @@ async function viewSend(id,mode){const m=$('#main');E={mode:mode||'doc',step:1,i
    else{const f=await call('getDocument',{documentId:id}),p=await call('getPdf',{documentId:id},120000);E.id=id;E.b64=p.b64;loadFull(f);E.step=2}}
   catch(e){toast(e.message,'e');return renderShell(E.mode==='template'?'tpl':'docs')}}
  drawSend()}
-async function viewTpl(){const m=$('#main');m.innerHTML='<div class="top"><h1>Templates</h1><button class="btn p" id="nt">New template</button></div><div id="tl">'+skel()+'</div>';$('#nt').onclick=()=>viewSend(null,'template');
+async function viewTpl(){const m=('#main');m.innerHTML='<divclass="top"><h1>Templates</h1><buttonclass="btnp"id="nt">Newtemplate</button></div><divid="tl">'+skel()+'</div>';('#nt').onclick=()=>viewSend(null,'template');
  try{const r=await call('getTemplates'),l=$('#tl');
   if(!r.templates.length){l.innerHTML='<div class="card">'+empty('No templates yet','Create a reusable template to speed up your signing workflow.','<button class="btn p" id="e2">New template</button>')+'</div>';$('#e2').onclick=()=>viewSend(null,'template');return}
   l.innerHTML='<div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">'+r.templates.map(t=>'<div class="card"><h3>'+esc(t.name)+'</h3><p class="sub">'+esc(t.description||'No description')+'</p><p class="sub">'+esc(t.id)+' · By '+esc(t.createdByName)+' · Updated '+new Date(t.updatedAt).toLocaleDateString()+' · Used '+t.usageCount+'x · v'+t.version+'</p><div class="row"><button class="btn s p" data-u="'+t.id+'">Use Template</button><button class="btn s" data-e="'+t.id+'">Edit</button><button class="btn s d" data-d="'+t.id+'">Delete</button></div></div>').join('')+'</div>';
@@ -179,7 +177,7 @@ function drawSend(){const m=$('#main'),S4=E.mode==='template'?['Upload','Roles',
  m.innerHTML='<h1>'+(E.mode==='template'?'Template':'Send for Signature')+'</h1><div class="steps" style="margin-top:12px">'+S4.map((s,i)=>'<span class="'+(E.step===i+1?'on':'')+'">'+(i+1)+'. '+s+'</span>').join('')+'</div><div id="st"></div>';
  [0,s1,s2,s3,s4][E.step]()}
 function s1(){$('#st').innerHTML='<div class="drop" id="dz"><h3>Drag and drop a PDF here</h3><p class="sub">or choose a file (up to 25 MB)</p><button class="btn p" id="pk">Choose PDF</button><input type="file" id="fi" accept="application/pdf" hidden></div>';
- const dz=$('#dz'),fi=$('#fi');$('#pk').onclick=e=>{e.stopPropagation();fi.click()};dz.onclick=()=>fi.click();fi.onchange=()=>up(fi.files[0]);
+ const dz=('#dz'),fi=('#fi');$('#pk').onclick=e=>{e.stopPropagation();fi.click()};dz.onclick=()=>fi.click();fi.onchange=()=>up(fi.files[0]);
  dz.ondragover=e=>{e.preventDefault();dz.classList.add('hv')};dz.ondragleave=()=>dz.classList.remove('hv');dz.ondrop=e=>{e.preventDefault();dz.classList.remove('hv');up(e.dataTransfer.files[0])}}
 async function up(f){if(!f)return;if(f.type!=='application/pdf'&&!/\.pdf$/i.test(f.name))return toast('Please choose a PDF file.','e');if(f.size>25e6)return toast('The PDF must be under 25 MB.','e');
  const dz=$('#dz');dz.innerHTML='<h3>Uploading...</h3>';try{const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f)});
@@ -194,7 +192,7 @@ function s2(){const el=$('#st');
   '<button class="btn" id="ar">Add recipient</button><p class="sub">'+(E.order==='sequential'?'Signers receive the request one after another, in the order above.':'All signers receive the request at the same time.')+'</p><label>Message<textarea id="ms" rows="3">'+esc(E.message)+'</textarea></label><div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn p" id="nx">Save and continue</button></div></div>';
   el.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>E.recips[+i.dataset.i][i.dataset.k]=i.value);el.querySelectorAll('[data-k=role]').forEach(i=>i.onchange=()=>E.recips[+i.dataset.i].role=i.value);
   el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,a=E.recips;if(b.dataset.m==='rm'){E.fields=E.fields.filter(f=>f.recipientId!==a[i].id);a.splice(i,1)}else{const j=b.dataset.m==='up'?i-1:i+1;if(j>=0&&j<a.length)[a[i],a[j]]=[a[j],a[i]]}draw()});
-  el.querySelectorAll('[name=o]').forEach(r=>r.onchange=()=>{E.order=r.value;draw()});$('#dn').oninput=e=>E.name=e.target.value;$('#ms').oninput=e=>E.message=e.target.value;$('#ar').onclick=()=>{E.recips.push({id:uid(),name:'',email:'',role:'signer'});draw()};
+  el.querySelectorAll('[name=o]').forEach(r=>r.onchange=()=>{E.order=r.value;draw()});('#dn').oninput=e=>E.name=e.target.value;('#ms').oninput=e=>E.message=e.target.value;$('#ar').onclick=()=>{E.recips.push({id:uid(),name:'',email:'',role:'signer'});draw()};
   $('#nx').onclick=e=>{if(!E.recips.some(r=>r.role==='signer'))return toast('Add at least one signer.','e');if(E.mode==='template'){if(E.recips.some(r=>!r.name.trim()))return toast('Every role needs a name.','e');return busy(e.target,'Saving...',async()=>{await persistT();E.step=3;drawSend()})}if(E.recips.some(r=>!r.name.trim()||!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(r.email.trim())))return toast('Every recipient needs a name and a valid email.','e');
    const em=E.recips.map(r=>r.email.trim().toLowerCase());if(new Set(em).size!==em.length)return toast('Each recipient needs a unique email.','e');
    busy(e.target,'Saving...',async()=>{await persist();E.step=3;drawSend()})}};draw()}
@@ -203,9 +201,9 @@ function s3(){const el=$('#st');el.innerHTML='<div class="row" style="margin-bot
  const ri=id=>E.recips.findIndex(r=>r.id===id),signers=()=>E.recips.filter(r=>r.role==='signer');
  const cnt=()=>$('#cnt').textContent='Required fields: '+E.fields.filter(f=>f.required).length+' · Total: '+E.fields.length;
  const props=()=>{const f=E.fields.find(x=>x.id===E.sel),p=$('#pp');if(!f){p.innerHTML='<h3>Fields</h3><p class="sub">Drag a field onto the document, or select a field to edit it. Fields are added for:</p><select id="cr">'+signers().map(r=>'<option value="'+r.id+'">'+esc(r.name)+'</option>').join('')+'</select><p class="sub">Delete removes the selected field. Esc deselects. Ctrl/Cmd+D duplicates.</p>';
-   $('#cr').value=(E.recips[rcur]||{}).id;$('#cr').onchange=e=>rcur=ri(e.target.value);return}
+   ('#cr').value=(E.recips[rcur]||).id;('#cr').onchange=e=>rcur=ri(e.target.value);return}
   p.innerHTML='<h3>'+TYPES[f.type]+'</h3><label>Assign to<select id="as">'+signers().map(r=>'<option value="'+r.id+'">'+esc(r.name)+'</option>').join('')+'</select></label><br><br><label><input type="checkbox" id="rq" style="width:auto" '+(f.required?'checked':'')+'> Required</label><br><label>Label<input id="lb" value="'+esc(f.label)+'"></label><p class="sub">Page '+f.page+' · X '+(f.x*100).toFixed(0)+'% · Y '+(f.y*100).toFixed(0)+'%</p><div class="row"><button class="btn s" id="dp">Duplicate</button><button class="btn s d" id="dl">Delete</button></div>';
-  $('#as').value=f.recipientId;$('#as').onchange=e=>{f.recipientId=e.target.value;rcur=ri(f.recipientId);draw()};$('#rq').onchange=e=>{f.required=e.target.checked;draw()};$('#lb').oninput=e=>{f.label=e.target.value;draw(true)};$('#dp').onclick=dup;$('#dl').onclick=del};
+  ('#as').value=f.recipientId;('#as').onchange=e=>{f.recipientId=e.target.value;rcur=ri(f.recipientId);draw()};('#rq').onchange=e=>f.required=e.target.checked;draw();('#lb').oninput=e=>{f.label=e.target.value;draw(true)};('#dp').onclick=dup;('#dl').onclick=del};
  const dup=()=>{const f=E.fields.find(x=>x.id===E.sel);if(!f)return;const n=Object.assign({},f,{id:uid(),x:Math.min(f.x+.02,1-f.w),y:Math.min(f.y+.02,1-f.h)});E.fields.push(n);E.sel=n.id;draw()};
  const del=()=>{E.fields=E.fields.filter(f=>f.id!==E.sel);E.sel=null;draw()};
  const add=(t,page,x,y)=>{const r=E.recips[rcur];if(!r)return toast('Add a signer first.','e');const[w,h]=SIZE[t];const f={id:uid(),recipientId:r.id,type:t,label:'',required:t!=='checkbox'&&t!=='text',page:page,x:Math.max(0,Math.min(x-w/2,1-w)),y:Math.max(0,Math.min(y-h/2,1-h)),w:w,h:h};E.fields.push(f);E.sel=f.id;draw()};
@@ -216,18 +214,18 @@ function s3(){const el=$('#st');el.innerHTML='<div class="row" style="margin-bot
     d.onpointermove=ev=>{const dx=(ev.clientX-sx)/R.width,dy=(ev.clientY-sy)/R.height;if(rs){f.w=Math.max(.03,Math.min(o.w+dx,1-f.x));f.h=Math.max(.02,Math.min(o.h+dy,1-f.y))}else{f.x=Math.max(0,Math.min(o.x+dx,1-f.w));f.y=Math.max(0,Math.min(o.y+dy,1-f.h))}d.style.left=f.x*100+'%';d.style.top=f.y*100+'%';d.style.width=f.w*100+'%';d.style.height=f.h*100+'%'};
     d.onpointerup=d.onpointercancel=()=>{d.onpointermove=null;props()};layers.forEach(ly=>ly.querySelectorAll('.fld.sel').forEach(x=>x.classList.remove('sel')));d.classList.add('sel');props()}});cnt();props()};
  el.querySelectorAll('.tb button').forEach(b=>{b.ondragstart=e=>e.dataTransfer.setData('text/plain',b.dataset.t);b.onclick=()=>add(b.dataset.t,1,.3,.2)});
- renderPdf($('#pgs'),E.b64).then(ls=>{layers=ls;ls.forEach(l=>{l.ondragover=e=>e.preventDefault();l.ondrop=e=>{e.preventDefault();const t=e.dataTransfer.getData('text/plain');if(!SIZE[t])return;const R=l.getBoundingClientRect();add(t,+l.dataset.page,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height)};l.onpointerdown=()=>{E.sel=null;draw()}});draw()}).catch(()=>$('#pgs').innerHTML='<div class="err">This PDF could not be displayed.</div>');
+ renderPdf(('#pgs'),E.b64).then(ls=>layers=ls;ls.forEach(l=>l.ondragover=e=>e.preventDefault();l.ondrop=e=>e.preventDefault();constt=e.dataTransfer.getData('text/plain');if(!SIZE[t])return;constR=l.getBoundingClientRect();add(t,+l.dataset.page,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height);l.onpointerdown=()=>E.sel=null;draw());draw()).catch(()=>('#pgs').innerHTML='<div class="err">This PDF could not be displayed.</div>');
  window.onkeydown=e=>{if(E&&E.step!==3||!$('#pgs'))return;if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;
   if(e.key==='Escape'){E.sel=null;draw()}else if((e.key==='Delete'||e.key==='Backspace')&&E.sel){e.preventDefault();del()}else if((e.ctrlKey||e.metaKey)&&e.key==='d'){e.preventDefault();dup()}};
- $('#bk').onclick=()=>{E.step=2;drawSend()};$('#nx').onclick=e=>E.mode==='template'?busy(e.target,'Saving...',async()=>{await persistT();E.step=4;drawSend()}):busy(e.target,'Saving...',async()=>{await persist();E.step=4;drawSend()})}
+ ('#bk').onclick=()=>E.step=2;drawSend();('#nx').onclick=e=>E.mode==='template'?busy(e.target,'Saving...',async()=>{await persistT();E.step=4;drawSend()}):busy(e.target,'Saving...',async()=>{await persist();E.step=4;drawSend()})}
 async function persist2(){/* fields were saved with the old recipient ids; resave once with the current ids */const f=await call('saveDraft',payload(),90000);loadFull(f)}
 function s4(){return E.mode==='template'?s4t():s4d()}
 function s4t(){$('#st').innerHTML='<div class="card"><h3>Save template</h3><label>Template name<input id="tn" value="'+esc(E.name)+'"></label><br><br><label>Description<input id="td" value="'+esc(E.desc)+'"></label><p class="sub">'+E.recips.length+' recipient role(s) · '+E.fields.length+' field(s). Using this template always creates a new document; the template itself never changes when you send.</p><div class="row" style="justify-content:space-between"><button class="btn" id="bk">Back to fields</button><button class="btn p" id="sv">SAVE TEMPLATE</button></div></div>';
- $('#bk').onclick=()=>{E.step=3;drawSend()};$('#sv').onclick=e=>busy(e.target,'Saving...',async()=>{E.name=$('#tn').value;E.desc=$('#td').value;await persistT();toast('Template saved.','o');renderShell('tpl')})}
+ ('#bk').onclick=()=>E.step=3;drawSend();('#sv').onclick=e=>busy(e.target,'Saving...',async()=>{E.name=('#tn').value;E.desc=('#td').value;await persistT();toast('Template saved.','o');renderShell('tpl')})}
 async function s4d(){const el=$('#st');el.innerHTML=skel();let issues=[];try{issues=(await call('validateDocument',{documentId:E.id})).issues}catch(e){el.innerHTML='<div class="err">'+esc(e.message)+'</div>';return}
  const sg=E.recips;el.innerHTML='<div class="card"><h3>'+esc(E.name)+'</h3>'+(issues.length?'<div class="err"><b>'+issues.length+' issue'+(issues.length>1?'s':'')+' need to be fixed before sending.</b><ol>'+issues.map(i=>'<li>'+esc(i)+'</li>').join('')+'</ol></div>':'')+
  '<p><b>Signing order:</b> '+(E.order==='sequential'?'Sequential':'Parallel')+'</p><ol>'+sg.map(r=>'<li>'+esc(r.name)+' &lt;'+esc(r.email)+'&gt; · '+r.role+(r.role==='signer'?' · '+E.fields.filter(f=>f.recipientId===r.id).length+' fields':'')+'</li>').join('')+'</ol>'+(E.message?'<p><b>Message:</b> '+esc(E.message)+'</p>':'')+'<p class="sub">Expires in 30 days after sending.</p><div class="row" style="justify-content:space-between"><button class="btn" id="bk">Back to fields</button><button class="btn p" id="sn" '+(issues.length?'disabled':'')+'>SEND FOR SIGNATURE</button></div></div>';
- $('#bk').onclick=()=>{E.step=3;drawSend()};$('#sn').onclick=e=>busy(e.target,'Sending...',async()=>{const r=await call('sendDocument',{documentId:E.id},90000);toast(r.already?'This document was already sent.':'Document sent successfully.','o');e.target.textContent='Sent Successfully';await loadDocs().catch(()=>{});renderShell('docs')})}
+ ('#bk').onclick=()=>E.step=3;drawSend();('#sn').onclick=e=>busy(e.target,'Sending...',async()=>{const r=await call('sendDocument',{documentId:E.id},90000);toast(r.already?'This document was already sent.':'Document sent successfully.','o');e.target.textContent='Sent Successfully';await loadDocs().catch(()=>{});renderShell('docs')})}
 
 /* ===== signer experience ===== */
 async function signerApp(token){const root=$('#root');root.innerHTML='<div style="padding:30px;max-width:600px;margin:auto"><p class="sub">Loading document...</p>'+skel()+'</div>';
@@ -275,3 +273,4 @@ async function buildPdf(b64,getAll,store){const a=await getAll(),pdf=await PDFLi
  if(cu){S.user=cu;return renderShell('dash')}
  try{S.user=(await call('getSession')); renderShell('dash')}catch(e){renderLogin()}})();
 </script></body></html>
+
