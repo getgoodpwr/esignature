@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com"><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GOODPWR E-SIGN</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -68,21 +69,22 @@ const bytes=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
 function toast(m,k){const d=document.createElement('div');d.className='t '+(k||'');d.textContent=m;$('#toast').appendChild(d);setTimeout(()=>d.remove(),4500)}
 function call(action,p,ms){return new Promise((res,rej)=>{const ac=new AbortController(),t=setTimeout(()=>ac.abort(),ms||60000);
  fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,session:S.token,p:p||{}}),signal:ac.signal,redirect:'follow'})
- .then(r=>r.json()).then(r=>{clearTimeout(t);if(r&&r.ok)return res(r.data);
+ .then(r=>r.text()).then(txt=>{clearTimeout(t);let r;try{r=JSON.parse(txt)}catch(e){console.error('Unexpected server response:',txt.slice(0,400));return rej(new Error('The server replied, but not with data the app understands. In Apps Script, redeploy as a NEW VERSION with access set to Anyone.'))}
+  if(r&&r.ok)return res(r.data);
   if(r&&r.error==='SESSION_EXPIRED'){signOut(true);return rej(new Error('Your session has expired. Please sign in again.'))}rej(new Error(r&&r.error?r.error:'Something went wrong. Please try again.'))})
- .catch(e=>{clearTimeout(t);rej(new Error(e.name==='AbortError'?'The request timed out. Please try again.':'Unable to connect to GOODPWR E-SIGN. Please try again.'))})})}
+ .catch(e=>{clearTimeout(t);console.error('Network error:',e);rej(new Error(e.name==='AbortError'?'The request timed out. Please try again.':'Unable to connect to GOODPWR E-SIGN. Please try again. (If this keeps happening, open the web app link in a new tab; it should say "GOODPWR E-SIGN API is running".)'))})})}
 async function busy(btn,label,fn){if(btn.disabled)return;const o=btn.textContent;btn.disabled=true;btn.textContent=label;try{return await fn()}catch(e){toast(e.message,'e')}finally{btn.disabled=false;btn.textContent=o}}
 function modal(html){const o=document.createElement('div');o.className='ov';o.innerHTML='<div class="md" role="dialog">'+html+'</div>';document.body.appendChild(o);o.close=()=>o.remove();return o}
 function confirmBox(msg,label){return new Promise(r=>{const o=modal('<h3>Are you sure?</h3><p>'+esc(msg)+'</p><div class="row" style="justify-content:flex-end"><button class="btn" id="n">Cancel</button><button class="btn p" id="y">'+esc(label||'Confirm')+'</button></div>');
  o.querySelector('#n').onclick=()=>{o.close();r(false)};o.querySelector('#y').onclick=()=>{o.close();r(true)}})}
 const fmt=d=>d?new Date(d).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}):'-';
-function signOut(silent){if(!silent&&S.token)call('logout').catch(()=>{});S.token=null;try{sessionStorage.removeItem('gp')}catch(e){}renderLogin(silent?'Your session has expired. Please sign in again.':'')}
+function signOut(silent){if(!silent&&S.token)call('logout').catch(()=>{});S.token=null;try{sessionStorage.removeItem('gp');sessionStorage.removeItem('gpu')}catch(e){}renderLogin(silent?'Your session has expired. Please sign in again.':'')}
 
 /* ===== boot ===== */
 
 function renderLogin(msg){$('#root').innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px"><div class="card" style="width:100%;max-width:380px;padding:28px"><div class="logo" style="padding-left:0">GOODPWR E-SIGN</div><h1>Sign in</h1><p class="sub">Use your @getgoodpwr.com email to sign in.</p>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+
  '<label>Name<input id="nm" autocomplete="name"></label><br><br><label>Email<input id="em" type="email" placeholder="you@getgoodpwr.com" autocomplete="username"></label><br><br><button class="btn p" id="go" style="width:100%">Sign in</button></div></div>';
- const go=()=>busy($('#go'),'Signing in...',async()=>{const r=await call('login',{name:$('#nm').value,email:$('#em').value});S.token=r.token;S.user=r.user;try{sessionStorage.setItem('gp',r.token)}catch(e){}renderShell('dash')});
+ const go=()=>busy($('#go'),'Signing in...',async()=>{const r=await call('login',{name:$('#nm').value,email:$('#em').value});S.token=r.token;S.user=r.user;try{sessionStorage.setItem('gp',r.token);sessionStorage.setItem('gpu',JSON.stringify(r.user))}catch(e){}renderShell('dash')});
  $('#go').onclick=go;$('#em').onkeydown=e=>{if(e.key==='Enter')go()}}
 
 /* ===== shell ===== */
@@ -98,18 +100,18 @@ function empty(t,s,btn){return '<div class="empty"><h3>'+t+'</h3><p class="sub">
 let DOCS=[];
 async function loadDocs(){DOCS=(await call('getDocuments')).docs}
 async function viewDash(){const m=$('#main');m.innerHTML='<h1>Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+esc(S.user.name.split(' ')[0])+'</h1><p class="sub">Here\'s what\'s happening with your documents.</p>'+skel();
- try{await loadDocs()}catch(e){m.innerHTML+='<div class="err">'+esc(e.message)+'</div>';return}
- const n=f=>DOCS.filter(f).length,soon=Date.now()+3*864e5,live=d=>['SENT','VIEWED','PARTIALLY_SIGNED'].includes(d.status);
+ const paint=()=>{const n=f=>DOCS.filter(f).length,soon=Date.now()+3*864e5,live=d=>['SENT','VIEWED','PARTIALLY_SIGNED'].includes(d.status);
  const c=[['Action Required',n(d=>d.mine)],['Waiting for Others',n(d=>live(d)&&!d.mine)],['Completed',n(d=>d.status==='COMPLETED')],['Drafts',n(d=>d.status==='DRAFT')],['Expiring Soon',n(d=>live(d)&&d.expiresAt&&new Date(d.expiresAt)<soon)]];
  m.innerHTML='<div class="top"><div><h1>Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+esc(S.user.name.split(' ')[0])+'</h1><p class="sub" style="margin:0">Here\'s what\'s happening with your documents.</p></div><button class="btn p" id="ns">Send for Signature</button></div><div class="cards">'+c.map(x=>'<div class="card stat"><b>'+x[1]+'</b>'+x[0]+'</div>').join('')+'</div><div class="card"><h3>Recent Documents</h3><div id="tbl"></div></div>';
- $('#ns').onclick=()=>renderShell('send');docTable($('#tbl'),DOCS.slice(0,8))}
+ $('#ns').onclick=()=>renderShell('send');docTable($('#tbl'),DOCS.slice(0,8))};
+ if(DOCS.length)paint();try{await loadDocs();paint()}catch(e){if(!DOCS.length)m.innerHTML+='<div class="err">'+esc(e.message)+'</div>'}}
 function viewDocs(){const m=$('#main');m.innerHTML='<div class="top"><h1>Documents</h1><button class="btn p" id="ns">Send for Signature</button></div><div class="card"><div class="tabs" id="tabs"></div><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Search documents or recipients" class="grow"><select id="sort" style="width:auto"><option value="u">Newest activity</option><option value="n">Name</option></select></div><div id="tbl">'+skel()+'</div></div>';
  $('#ns').onclick=()=>renderShell('send');
  const tabs=[['all','All',()=>true],['act','Action Required',d=>d.mine],['wait','Waiting for Others',d=>['SENT','VIEWED','PARTIALLY_SIGNED'].includes(d.status)&&!d.mine],['done','Completed',d=>d.status==='COMPLETED'],['draft','Drafts',d=>d.status==='DRAFT'],['void','Voided',d=>d.status==='VOIDED']];let cur='all';
  const draw=()=>{$('#tabs').innerHTML=tabs.map(t=>'<button data-t="'+t[0]+'" class="'+(t[0]===cur?'on':'')+'">'+t[1]+'</button>').join('');$('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{cur=b.dataset.t;draw()});
   const q=$('#q').value.toLowerCase(),f=tabs.find(t=>t[0]===cur)[2];let l=DOCS.filter(f).filter(d=>!q||(d.name+d.recipients.map(r=>r.name+r.email).join(' ')).toLowerCase().includes(q));
   if($('#sort').value==='n')l=l.slice().sort((a,b)=>a.name.localeCompare(b.name));docTable($('#tbl'),l,true)};
- $('#q').oninput=draw;$('#sort').onchange=draw;loadDocs().then(draw).catch(e=>$('#tbl').innerHTML='<div class="err">'+esc(e.message)+'</div>')}
+ $('#q').oninput=draw;$('#sort').onchange=draw;if(DOCS.length)draw();loadDocs().then(draw).catch(e=>$('#tbl').innerHTML='<div class="err">'+esc(e.message)+'</div>')}
 function docTable(el,list,full){if(!list.length){el.innerHTML=empty('No documents yet','Send your first document for signature and track everything in one place.','<button class="btn p" id="e1">Send for Signature</button>');$('#e1').onclick=()=>renderShell('send');return}
  el.innerHTML='<div class="tw"><table><thead><tr><th>Document</th><th>Recipient(s)</th><th>Status</th>'+(full?'<th>Progress</th>':'')+'<th>Created</th><th>Last Activity</th><th>Actions</th></tr></thead><tbody>'+list.map(d=>{const live=['SENT','VIEWED','PARTIALLY_SIGNED'].includes(d.status);
   return '<tr><td><b>'+esc(d.name)+'</b><br><span class="sub">'+esc(d.senderName)+'</span></td><td>'+d.recipients.map(r=>esc(r.name)+(r.role!=='signer'?' ('+r.role+')':'')).join('<br>')+'</td><td><span class="badge b-'+d.status+'">'+(ST[d.status]||d.status)+'</span></td>'+
@@ -193,8 +195,7 @@ function s2(){const el=$('#st');
   el.querySelectorAll('[name=o]').forEach(r=>r.onchange=()=>{E.order=r.value;draw()});$('#dn').oninput=e=>E.name=e.target.value;$('#ms').oninput=e=>E.message=e.target.value;$('#ar').onclick=()=>{E.recips.push({id:uid(),name:'',email:'',role:'signer'});draw()};
   $('#nx').onclick=e=>{if(!E.recips.some(r=>r.role==='signer'))return toast('Add at least one signer.','e');if(E.mode==='template'){if(E.recips.some(r=>!r.name.trim()))return toast('Every role needs a name.','e');return busy(e.target,'Saving...',async()=>{await persistT();E.step=3;drawSend()})}if(E.recips.some(r=>!r.name.trim()||!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(r.email.trim())))return toast('Every recipient needs a name and a valid email.','e');
    const em=E.recips.map(r=>r.email.trim().toLowerCase());if(new Set(em).size!==em.length)return toast('Each recipient needs a unique email.','e');
-   busy(e.target,'Saving...',async()=>{const m=E.recips.map(r=>r.id);const old=E.recips.slice(),of=E.fields.slice();await persist();/* ids change; remap fields by recipient position */
-    of.forEach(f=>{const i=old.findIndex(r=>r.id===f.recipientId);f.recipientId=E.recips[i]?E.recips[i].id:''});E.fields=of.map((f,k)=>Object.assign(f,{id:uid()}));E.step=3;drawSend()})}};draw()}
+   busy(e.target,'Saving...',async()=>{await persist();E.step=3;drawSend()})}};draw()}
 function s3(){const el=$('#st');el.innerHTML='<div class="row" style="margin-bottom:8px"><span class="sub" id="cnt"></span></div><div class="ed"><div class="tb">'+Object.keys(TYPES).map(t=>'<button class="btn" draggable="true" data-t="'+t+'">'+TYPES[t]+'</button>').join('')+'</div><div class="pages" id="pgs">'+skel()+'</div><div class="card" id="pp"></div></div><div class="row" style="justify-content:space-between;margin-top:12px"><button class="btn" id="bk">Back</button><button class="btn p" id="nx">Save and review</button></div>';
  let layers=[],rcur=E.recips.findIndex(r=>r.role==='signer');
  const ri=id=>E.recips.findIndex(r=>r.id===id),signers=()=>E.recips.filter(r=>r.role==='signer');
@@ -216,8 +217,7 @@ function s3(){const el=$('#st');el.innerHTML='<div class="row" style="margin-bot
  renderPdf($('#pgs'),E.b64).then(ls=>{layers=ls;ls.forEach(l=>{l.ondragover=e=>e.preventDefault();l.ondrop=e=>{e.preventDefault();const t=e.dataTransfer.getData('text/plain');if(!SIZE[t])return;const R=l.getBoundingClientRect();add(t,+l.dataset.page,(e.clientX-R.left)/R.width,(e.clientY-R.top)/R.height)};l.onpointerdown=()=>{E.sel=null;draw()}});draw()}).catch(()=>$('#pgs').innerHTML='<div class="err">This PDF could not be displayed.</div>');
  window.onkeydown=e=>{if(E&&E.step!==3||!$('#pgs'))return;if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;
   if(e.key==='Escape'){E.sel=null;draw()}else if((e.key==='Delete'||e.key==='Backspace')&&E.sel){e.preventDefault();del()}else if((e.ctrlKey||e.metaKey)&&e.key==='d'){e.preventDefault();dup()}};
- $('#bk').onclick=()=>{E.step=2;drawSend()};$('#nx').onclick=e=>E.mode==='template'?busy(e.target,'Saving...',async()=>{await persistT();E.step=4;drawSend()}):busy(e.target,'Saving...',async()=>{const rc=E.recips.map(r=>r.id),o=E.fields.slice(),old=E.recips.slice();await persist();o.forEach(f=>{const i=old.findIndex(r=>r.id===f.recipientId);f.recipientId=E.recips[i]?E.recips[i].id:''});await Promise.resolve();
-   E.fields=o;await persist2();E.step=4;drawSend()})}
+ $('#bk').onclick=()=>{E.step=2;drawSend()};$('#nx').onclick=e=>E.mode==='template'?busy(e.target,'Saving...',async()=>{await persistT();E.step=4;drawSend()}):busy(e.target,'Saving...',async()=>{await persist();E.step=4;drawSend()})}
 async function persist2(){/* fields were saved with the old recipient ids; resave once with the current ids */const f=await call('saveDraft',payload(),90000);loadFull(f)}
 function s4(){return E.mode==='template'?s4t():s4d()}
 function s4t(){$('#st').innerHTML='<div class="card"><h3>Save template</h3><label>Template name<input id="tn" value="'+esc(E.name)+'"></label><br><br><label>Description<input id="td" value="'+esc(E.desc)+'"></label><p class="sub">'+E.recips.length+' recipient role(s) · '+E.fields.length+' field(s). Using this template always creates a new document; the template itself never changes when you send.</p><div class="row" style="justify-content:space-between"><button class="btn" id="bk">Back to fields</button><button class="btn p" id="sv">SAVE TEMPLATE</button></div></div>';
@@ -230,7 +230,7 @@ async function s4d(){const el=$('#st');el.innerHTML=skel();let issues=[];try{iss
 /* ===== signer experience ===== */
 async function signerApp(token){const root=$('#root');root.innerHTML='<div style="padding:30px;max-width:600px;margin:auto"><p class="sub">Loading document...</p>'+skel()+'</div>';
  const msg=(t,sub,btn)=>{root.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px"><div class="card" style="max-width:420px;text-align:center"><div class="logo">GOODPWR E-SIGN</div><h3>'+esc(t)+'</h3><p class="sub">'+esc(sub||'')+'</p>'+(btn||'')+'</div></div>'};
- let g;try{g=await call('signGet',{token})}catch(e){return msg('Unable to open this document',e.message)}
+ const pdfP=call('signPdf',{token},120000).catch(()=>null);let g;try{g=await call('signGet',{token})}catch(e){return msg('Unable to open this document',e.message)}
  if(g.state==='completed'){if(g.needsPdf){root.innerHTML='<div style="padding:40px;text-align:center"><h3>Generating document...</h3><p class="sub">Please keep this page open.</p></div>';try{const bb=(await call('signPdf',{token},120000)).b64;await buildPdf(bb,()=>call('signAll',{token}),pdf=>call('signStorePdf',{token,pdf}));g.hasPdf=true}catch(x){}}msg('This document has already been completed.',g.doc.name,g.hasPdf?'<button class="btn p" id="dl">Download</button>':'');const b=$('#dl');if(b)b.onclick=()=>busy(b,'Preparing...',async()=>{const r=await call('signPdf',{token},120000);download(r.b64,r.name+' - Completed.pdf')});return}
  if(g.state!=='open')return msg(g.state==='done'?'Your signature has been successfully recorded.':g.message,g.doc.name);
  g.fields=g.fields.map(f=>{const p=g.pages[f.page-1]||[612,792];return Object.assign({},f,{x:f.x/p[0],y:f.y/p[1],w:f.w/p[0],h:f.h/p[1]})});const V=Object.assign({},g.values),pend=[];let adopted={signature:null,initials:null},pdfb64;
@@ -253,7 +253,7 @@ async function signerApp(token){const root=$('#root');root.innerHTML='<div style
   cv.onpointerdown=e=>{dn=true;cv.setPointerCapture(e.pointerId);const p=pt(e);cx.beginPath();cx.moveTo(p[0],p[1])};cv.onpointermove=e=>{if(!dn)return;const p=pt(e);cx.lineTo(p[0],p[1]);cx.stroke();drew=true};cv.onpointerup=()=>dn=false;
   o.querySelector('#ok').onclick=()=>{let url;if(mode==='draw'){if(!drew)return toast('Draw your signature first.','e');url=cv.toDataURL('image/png')}else{const t=o.querySelector('#tx').value.trim();if(!t)return toast('Enter your name.','e');const c2=document.createElement('canvas');c2.width=600;c2.height=160;const x=c2.getContext('2d');x.fillStyle='#111';x.font='italic 72px "Brush Script MT","Segoe Script",cursive';x.textBaseline='middle';x.fillText(t,10,85,580);url=c2.toDataURL('image/png')}
    adopted[f.type]=url;save(f,url);draw(f);o.close()}};
- $('#pgs').innerHTML='<p class="sub" style="padding:20px">Loading document...</p>';try{pdfb64=(await call('signPdf',{token},120000)).b64;layers=await renderPdf($('#pgs'),pdfb64);if(g.pageCount&&layers.length!==g.pageCount)throw new Error('pages')}catch(e){return msg('Unable to load this document. Please refresh or contact the sender.')}
+ $('#pgs').innerHTML='<p class="sub" style="padding:20px">Loading document...</p>';try{pdfb64=((await pdfP)||(await call('signPdf',{token},120000))).b64;layers=await renderPdf($('#pgs'),pdfb64);if(g.pageCount&&layers.length!==g.pageCount)throw new Error('pages')}catch(e){return msg('Unable to load this document. Please refresh or contact the sender.')}
  g.fields.forEach(draw);prog();
  $('#nf').onclick=()=>{const f=req.find(x=>!done(x));if(!f)return toast('All required fields completed.','o');const d=els[f.id];d.scrollIntoView({behavior:'smooth',block:'center'});d.classList.remove('act');void d.offsetWidth;d.classList.add('act');const i=d.querySelector('input');if(i)i.focus()};
  $('#fin').onclick=e=>busy(e.target,'Completing signature...',async()=>{await Promise.all(pend);$('#err').innerHTML='';tried=true;const miss=req.filter(f=>!done(f));req.forEach(f=>els[f.id]&&els[f.id].classList.toggle('miss',!done(f)));if(miss.length){$('#err').innerHTML='<div class="err">Please complete all required fields before finishing. '+miss.length+' required field'+(miss.length>1?'s':'')+' left, marked in red.</div>';const m0=els[miss[0].id];if(m0)m0.scrollIntoView({behavior:'smooth',block:'center'});return}
@@ -269,5 +269,7 @@ async function buildPdf(b64,getAll,store){const a=await getAll(),pdf=await PDFLi
 /* ===== start (must stay last so every function and constant above exists) ===== */
 (async function(){if(BOOT.token)return signerApp(BOOT.token);
  if(!S.token)return renderLogin();
+ let cu=null;try{cu=JSON.parse(sessionStorage.getItem('gpu'))}catch(e){}
+ if(cu){S.user=cu;return renderShell('dash')}
  try{S.user=(await call('getSession')); renderShell('dash')}catch(e){renderLogin()}})();
 </script></body></html>
